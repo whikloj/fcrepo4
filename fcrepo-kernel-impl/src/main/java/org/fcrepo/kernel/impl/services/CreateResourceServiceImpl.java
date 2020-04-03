@@ -120,6 +120,7 @@ public class CreateResourceServiceImpl extends AbstractService implements Create
         final var descId = binaryId + "/" + FCR_METADATA;
         final var createOp = rdfSourceOperationFactory.createBuilder(descId, FEDORA_NON_RDF_SOURCE_DESCRIPTION_URI)
                 .userPrincipal(userPrincipal)
+                .parentId(binaryId)
                 .build();
         try {
             pSession.persist(createOp);
