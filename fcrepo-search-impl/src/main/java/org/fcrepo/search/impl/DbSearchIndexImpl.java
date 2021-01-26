@@ -17,33 +17,17 @@
  */
 package org.fcrepo.search.impl;
 
-import org.fcrepo.common.db.DbPlatform;
-import org.fcrepo.kernel.api.exception.RepositoryRuntimeException;
-import org.fcrepo.kernel.api.identifiers.FedoraId;
-import org.fcrepo.kernel.api.models.ResourceFactory;
-import org.fcrepo.kernel.api.models.ResourceHeaders;
-import org.fcrepo.search.api.Condition;
-import org.fcrepo.search.api.InvalidQueryException;
-import org.fcrepo.search.api.PaginationInfo;
-import org.fcrepo.search.api.SearchIndex;
-import org.fcrepo.search.api.SearchParameters;
-import org.fcrepo.search.api.SearchResult;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.core.io.DefaultResourceLoader;
-import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.RowMapper;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
-import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils;
-import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import static java.time.format.DateTimeFormatter.ISO_INSTANT;
+import static java.util.Collections.EMPTY_LIST;
+import static org.fcrepo.common.db.DbPlatform.H2;
+import static org.fcrepo.common.db.DbPlatform.MARIADB;
+import static org.fcrepo.common.db.DbPlatform.MYSQL;
+import static org.fcrepo.common.db.DbPlatform.POSTGRESQL;
+import static org.fcrepo.search.api.Condition.Field.CONTENT_SIZE;
+import static org.fcrepo.search.api.Condition.Field.FEDORA_ID;
+import static org.fcrepo.search.api.Condition.Field.MIME_TYPE;
+import static org.fcrepo.search.api.Condition.Field.RDF_TYPE;
 
-import javax.annotation.PostConstruct;
-import javax.inject.Inject;
-import javax.sql.DataSource;
 import java.net.URI;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -58,16 +42,34 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static java.time.format.DateTimeFormatter.ISO_INSTANT;
-import static java.util.Collections.EMPTY_LIST;
-import static org.fcrepo.common.db.DbPlatform.H2;
-import static org.fcrepo.common.db.DbPlatform.MARIADB;
-import static org.fcrepo.common.db.DbPlatform.MYSQL;
-import static org.fcrepo.common.db.DbPlatform.POSTGRESQL;
-import static org.fcrepo.search.api.Condition.Field.CONTENT_SIZE;
-import static org.fcrepo.search.api.Condition.Field.FEDORA_ID;
-import static org.fcrepo.search.api.Condition.Field.MIME_TYPE;
-import static org.fcrepo.search.api.Condition.Field.RDF_TYPE;
+import javax.annotation.PostConstruct;
+import javax.inject.Inject;
+import javax.sql.DataSource;
+
+import org.fcrepo.common.db.DbPlatform;
+import org.fcrepo.kernel.api.exception.RepositoryRuntimeException;
+import org.fcrepo.kernel.api.identifiers.FedoraId;
+import org.fcrepo.kernel.api.models.ResourceFactory;
+import org.fcrepo.kernel.api.models.ResourceHeaders;
+import org.fcrepo.search.api.Condition;
+import org.fcrepo.search.api.InvalidQueryException;
+import org.fcrepo.search.api.PaginationInfo;
+import org.fcrepo.search.api.SearchIndex;
+import org.fcrepo.search.api.SearchParameters;
+import org.fcrepo.search.api.SearchResult;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.io.DefaultResourceLoader;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
+import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 
 /**
@@ -208,7 +210,7 @@ public class DbSearchIndexImpl implements SearchIndex {
         }
 
         final var sql =
-                new StringBuilder("SELECT " + String.join(",", fields) + " FROM " + SIMPLE_SEARCH_TABLE + " s");
+                new StringBuilder("SELECT %PLACEHOLDER% FROM " + SIMPLE_SEARCH_TABLE + " s");
 
         if (containsRDFTypeField) {
             sql.append(rdfTables);
@@ -231,6 +233,9 @@ public class DbSearchIndexImpl implements SearchIndex {
                 }
             }
         }
+
+        final String countQuery = sql.toString().replace("%PLACEHOLDER%", "count(*) as count");
+
         sql.append(" ORDER BY " + parameters.getOrderBy() + " " + parameters.getOrder());
         sql.append(" LIMIT :limit OFFSET :offset");
 
@@ -257,8 +262,11 @@ public class DbSearchIndexImpl implements SearchIndex {
             }
         };
 
-        final List<Map<String, Object>> items = jdbcTemplate.query(sql.toString(), parameterSource, rowMapper);
-        final var pagination = new PaginationInfo(parameters.getMaxResults(), parameters.getOffset());
+        final String selectQuery = sql.toString().replace("%PLACEHOLDER%", String.join(",", fields));
+        final Integer totalResults = jdbcTemplate.queryForObject(countQuery, parameterSource, Integer.class);
+        final List<Map<String, Object>> items = jdbcTemplate.query(selectQuery, parameterSource, rowMapper);
+        final var pagination = new PaginationInfo(parameters.getMaxResults(), parameters.getOffset(),
+                (totalResults != null ? totalResults : 0));
         LOGGER.debug("Search query with parameters: {} - {}", sql, parameters);
         return new SearchResult(items, pagination);
     }
