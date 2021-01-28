@@ -1,4 +1,10 @@
-
+#set( $firstCount = $searchResults.getPagination().getOffset() + 1 )
+<div class="search-paging">
+<div class="search-paging-control">#if( $hasPrev ) <a href="javascript://" id="search-paging-previous">Previous</a>#end</div>
+<div class="search-paging-info" id="search-paging-results">Results $firstCount to $helpers.getResultRangeEnd($searchResults) of
+$searchResults.getPagination().getTotalResults()</div>
+<div class="search-paging-control">#if( $hasNext )<a href="javascript://" id="search-paging-next">Next</a>#end</div>
+</div>
 <table>
     <thead>
         <tr>

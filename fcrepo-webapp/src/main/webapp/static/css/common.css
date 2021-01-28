@@ -132,3 +132,17 @@ dd {
 #action_search label {
   padding: 2px 5px;
 }
+
+.search-paging {
+  border-top: 1px solid #000;
+  border-bottom: 1px solid #000;
+  display: grid;
+  grid-template-columns: 20% auto 20%;
+}
+
+.search-paging-control, .search-paging-info {
+  text-align: center;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  font-size: 1.2em;
+}

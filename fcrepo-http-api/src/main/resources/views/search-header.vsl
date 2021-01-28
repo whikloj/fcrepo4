@@ -1,5 +1,10 @@
+#set( $hasPrev = $helpers.hasPreviousResultPage($searchResults) )
+#set( $hasNext = $helpers.hasNextResultPage($searchResults) )
 <script type="text/javascript">
 <!--
+   const previousOffset = #if( $hasPrev ) $helpers.getPreviousOffset($searchResults) #{else} null #end;
+   const nextOffset = #if( $hasNext ) $helpers.getNextOffset($searchResults) #{else} null #end;
+   var currentOffset = 0;
    const fields = [
       #foreach( $f in $fields )
         "$f",
@@ -10,5 +15,6 @@
         "$o",
       #end
    ];
+
 //-->
 </script>

@@ -18,6 +18,11 @@
 package org.fcrepo.http.commons.responses;
 
 import static com.google.common.collect.Lists.newArrayList;
+import static java.util.Arrays.asList;
+import static java.util.Arrays.stream;
+import static java.util.Collections.emptyMap;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toMap;
 import static org.apache.jena.atlas.iterator.Iter.asStream;
 import static org.apache.jena.graph.GraphUtil.listObjects;
 import static org.apache.jena.rdf.model.ResourceFactory.createProperty;
@@ -26,11 +31,6 @@ import static org.apache.jena.vocabulary.DC.title;
 import static org.apache.jena.vocabulary.RDF.type;
 import static org.apache.jena.vocabulary.RDFS.label;
 import static org.apache.jena.vocabulary.SKOS.prefLabel;
-import static java.util.Arrays.asList;
-import static java.util.Arrays.stream;
-import static java.util.Collections.emptyMap;
-import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toMap;
 import static org.fcrepo.kernel.api.FedoraTypes.FCR_METADATA;
 import static org.fcrepo.kernel.api.FedoraTypes.FCR_VERSIONS;
 import static org.fcrepo.kernel.api.RdfLexicon.CONTAINS;
@@ -52,23 +52,23 @@ import java.util.StringJoiner;
 
 import javax.ws.rs.core.UriInfo;
 
+import org.fcrepo.http.commons.api.rdf.TripleOrdering;
+import org.fcrepo.search.api.SearchResult;
+
 import org.apache.jena.graph.Graph;
+import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.graph.impl.LiteralLabel;
-import org.apache.jena.vocabulary.DCTerms;
-
-import org.fcrepo.http.commons.api.rdf.TripleOrdering;
-import org.slf4j.Logger;
-
-import org.apache.jena.graph.Node;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.Property;
 import org.apache.jena.rdf.model.Resource;
 import org.apache.jena.rdf.model.ResourceFactory;
 import org.apache.jena.shared.PrefixMapping;
+import org.apache.jena.vocabulary.DCTerms;
 import org.apache.jena.vocabulary.RDF;
 import org.apache.jena.vocabulary.RDFS;
+import org.slf4j.Logger;
 
 /**
  * General view helpers for rendering HTML responses
@@ -514,5 +514,63 @@ public class ViewHelpers {
 
     private static String formatAsString(final Long input) {
         return (input == null ? "" : input.toString());
+    }
+
+    /**
+     * Is there a previous result page
+     * @param result a search result
+     * @return true if there is a previous page of results.
+     */
+    public boolean hasPreviousResultPage(final SearchResult result) {
+        return result.getPagination().getOffset() > 0;
+    }
+
+    /**
+     * Is there a next result page.
+     * @param result a search result
+     * @return true if there are more results.
+     */
+    public boolean hasNextResultPage(final SearchResult result) {
+        return result.getPagination().getOffset() + result.getPagination().getMaxResults() <
+                result.getPagination().getTotalResults();
+    }
+
+    /**
+     * Get the previous offset position based on current maxResults setting.
+     * @param result the search result.
+     * @return Returns the larger of current offset minus maxResults or 0.
+     */
+    public int getPreviousOffset(final SearchResult result) {
+        final int offset = result.getPagination().getOffset();
+        if (offset > 0 && (offset - result.getPagination().getMaxResults()) >= 0) {
+            return offset - result.getPagination().getMaxResults();
+        }
+        return 0;
+    }
+
+    /**
+     * Return the next offset position based on current number of results. This does not assume there are anymore
+     * results. Use hasNextResultPage() to check that first.
+     *
+     * @param result the search results.
+     * @return the next offset position.
+     */
+    public int getNextOffset(final SearchResult result) {
+        final int offset = result.getPagination().getOffset();
+        final int maxResults = result.getPagination().getMaxResults();
+        return offset + maxResults;
+    }
+
+    /**
+     * Get the lower of total results or this offset + maxResults
+     * @param result the search result
+     * @return the end of the current page of results.
+     */
+    public int getResultRangeEnd(final SearchResult result) {
+        final var page = result.getPagination();
+        if (page.getTotalResults() < page.getOffset() + page.getMaxResults()) {
+            return page.getTotalResults();
+        }
+        return page.getOffset() + page.getMaxResults();
     }
 }
