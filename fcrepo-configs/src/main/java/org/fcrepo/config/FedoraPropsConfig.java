@@ -48,6 +48,8 @@ public class FedoraPropsConfig extends BasePropsConfig {
     public static final String FCREPO_JMS_ENABLED = "fcrepo.jms.enabled";
     private static final String FCREPO_EVENT_THREADS = "fcrepo.event.threads";
     public static final String FCREPO_TRANSACTION_ON_CONFLICT = "fcrepo.response.include.transaction";
+    public static final String FCREPO_CORS_ENABLE_HEADERS = "fcrepo.cors.enabled";
+    public static final String FCREPO_CORS_ALLOWED_ORIGIN = "fcrepo.cors.allowed_origins";
 
     private static final String DATA_DIR_DEFAULT_VALUE = "data";
     private static final String LOG_DIR_DEFAULT_VALUE = "logs";
@@ -141,6 +143,12 @@ public class FedoraPropsConfig extends BasePropsConfig {
 
     @Value("${" + FCREPO_TRANSACTION_ON_CONFLICT + ":false}")
     private boolean includeTransactionOnConflict;
+
+    @Value("${" + FCREPO_CORS_ENABLE_HEADERS + ":false}")
+    private boolean corsEnabled;
+
+    @Value("${" + FCREPO_CORS_ALLOWED_ORIGIN + ":*}")
+    private String corsAllowedOrigin;
 
 
     @PostConstruct
@@ -436,4 +444,17 @@ public class FedoraPropsConfig extends BasePropsConfig {
         this.includeTransactionOnConflict = includeTransactionOnConflict;
     }
 
+    /**
+     * @return if CORS headers should be returned.
+     */
+    public boolean isCorsEnabled() {
+        return this.corsEnabled;
+    }
+
+    /**
+     * @return the allowed origins for returned Access-Control-Allow-Origin headers
+     */
+    public String getCorsAllowedOrigin() {
+        return this.corsAllowedOrigin;
+    }
 }
