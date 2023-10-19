@@ -76,7 +76,10 @@ public class CorsResponseFilter extends RequestContextFilter {
                     response.setHeader("Access-Control-Allow-Origin", origin);
                     response.addHeader("Vary", "Origin");
                 }
+                // This specifies which headers we will accept in a request.
                 response.setHeader("Access-Control-Allow-Headers", String.join(",", allowedHeaders));
+                // This specifies which headers we are saying the client can access from the response.
+                response.setHeader("Access-Control-Expose-Headers", String.join(",", allowedHeaders));
                 if (response.getHeader("Access-Control-Allow-Origin") != null &&
                         response.getHeader("Access-Control-Allow-Origin") != "*") {
                     response.setHeader("Access-Control-Allow-Credentials", "true");
