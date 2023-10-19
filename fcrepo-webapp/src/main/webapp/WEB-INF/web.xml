@@ -97,6 +97,12 @@
     <url-pattern>/static/*</url-pattern>
   </filter-mapping>
 
+  <security-role>
+    <role-name>fedoraUser</role-name>
+  </security-role>
+  <security-role>
+    <role-name>fedoraAdmin</role-name>
+  </security-role>
   <security-constraint>
     <web-resource-collection>
       <web-resource-name>Fedora</web-resource-name>
@@ -104,7 +110,6 @@
       <http-method>DELETE</http-method>
       <http-method>PUT</http-method>
       <http-method>HEAD</http-method>
-      <http-method>OPTIONS</http-method>
       <http-method>PATCH</http-method>
       <http-method>GET</http-method>
       <http-method>POST</http-method>

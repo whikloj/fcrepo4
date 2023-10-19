@@ -6,21 +6,10 @@
 
 package org.fcrepo.webapp;
 
-import java.util.HashSet;
-import java.util.List;
-
 import javax.servlet.Filter;
 
-import org.fcrepo.auth.common.ContainerRolesPrincipalProvider;
-import org.fcrepo.auth.common.DelegateHeaderPrincipalProvider;
-import org.fcrepo.auth.common.HttpHeaderPrincipalProvider;
-import org.fcrepo.auth.common.PrincipalProvider;
-import org.fcrepo.auth.common.ServletContainerAuthFilter;
-import org.fcrepo.auth.common.ServletContainerAuthenticatingRealm;
-import org.fcrepo.auth.webac.WebACAuthorizingRealm;
-import org.fcrepo.auth.webac.WebACFilter;
-import org.fcrepo.config.AuthPropsConfig;
-import org.fcrepo.config.ConditionOnPropertyTrue;
+import java.util.HashSet;
+import java.util.List;
 
 import org.apache.shiro.realm.AuthenticatingRealm;
 import org.apache.shiro.realm.AuthorizingRealm;
@@ -29,6 +18,17 @@ import org.apache.shiro.spring.web.ShiroFilterFactoryBean;
 import org.apache.shiro.web.filter.InvalidRequestFilter;
 import org.apache.shiro.web.mgt.DefaultWebSecurityManager;
 import org.apache.shiro.web.mgt.WebSecurityManager;
+import org.fcrepo.auth.common.ContainerRolesPrincipalProvider;
+import org.fcrepo.auth.common.DelegateHeaderPrincipalProvider;
+import org.fcrepo.auth.common.HttpHeaderPrincipalProvider;
+import org.fcrepo.auth.common.PrincipalProvider;
+import org.fcrepo.auth.common.ServletContainerAuthFilter;
+import org.fcrepo.auth.common.ServletContainerAuthenticatingRealm;
+import org.fcrepo.auth.webac.CorsResponseFilter;
+import org.fcrepo.auth.webac.WebACAuthorizingRealm;
+import org.fcrepo.auth.webac.WebACFilter;
+import org.fcrepo.config.AuthPropsConfig;
+import org.fcrepo.config.ConditionOnPropertyTrue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -158,6 +158,15 @@ public class AuthConfig {
     }
 
     /**
+     * @return CORS Response filter
+     */
+    @Bean
+    @Order(1)
+    public Filter corsFilter() {
+        return new CorsResponseFilter();
+    }
+
+    /**
      * @return Authentication Filter
      */
     @Bean
@@ -202,7 +211,7 @@ public class AuthConfig {
     public ShiroFilterFactoryBean shiroFilter(final AuthPropsConfig propsConfig) {
         final var filter = new ShiroFilterFactoryBean();
         filter.setSecurityManager(securityManager());
-        filter.setFilterChainDefinitions("/** = servletContainerAuthFilter,"
+        filter.setFilterChainDefinitions("/** = corsFilter, servletContainerAuthFilter,"
                 + principalProviderChain(propsConfig) + "webACFilter");
         return filter;
     }
