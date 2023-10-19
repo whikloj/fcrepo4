@@ -3,7 +3,7 @@
  * detailed in the LICENSE and NOTICE files at the root of the source
  * tree.
  */
-package org.fcrepo.auth.webac;
+package org.fcrepo.http.api.responses;
 
 import static org.fcrepo.http.commons.session.TransactionConstants.ATOMIC_EXPIRES_HEADER;
 import static org.fcrepo.http.commons.session.TransactionConstants.ATOMIC_ID_HEADER;
@@ -40,8 +40,15 @@ public class CorsResponseFilter extends RequestContextFilter {
     @Inject
     private FedoraPropsConfig fedoraPropsConfig;
 
-    private static final List<String> allowedHeaders = List.of(
+    private static final List<String> ALLOWED_HEADERS = List.of(
             AUTHORIZATION,
+            CONTENT_TYPE,
+            ATOMIC_ID_HEADER,
+            ATOMIC_EXPIRES_HEADER,
+            "Link"
+    );
+
+    private static final List<String> EXPOSED_HEADERS = List.of(
             CONTENT_TYPE,
             ATOMIC_ID_HEADER,
             ATOMIC_EXPIRES_HEADER,
@@ -77,9 +84,9 @@ public class CorsResponseFilter extends RequestContextFilter {
                     response.addHeader("Vary", "Origin");
                 }
                 // This specifies which headers we will accept in a request.
-                response.setHeader("Access-Control-Allow-Headers", String.join(",", allowedHeaders));
+                response.setHeader("Access-Control-Allow-Headers", String.join(",", ALLOWED_HEADERS));
                 // This specifies which headers we are saying the client can access from the response.
-                response.setHeader("Access-Control-Expose-Headers", String.join(",", allowedHeaders));
+                response.setHeader("Access-Control-Expose-Headers", String.join(",", EXPOSED_HEADERS));
                 if (response.getHeader("Access-Control-Allow-Origin") != null &&
                         response.getHeader("Access-Control-Allow-Origin") != "*") {
                     response.setHeader("Access-Control-Allow-Credentials", "true");

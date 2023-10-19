@@ -6,17 +6,18 @@
 
 package org.fcrepo.webapp;
 
-import java.io.IOException;
-
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import java.io.IOException;
+
 import org.fcrepo.config.AuthPropsConfig;
 import org.fcrepo.config.ConditionOnPropertyFalse;
-
+import org.fcrepo.config.FedoraPropsConfig;
+import org.fcrepo.http.api.responses.CorsResponseFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -44,19 +45,24 @@ public class NoAuthConfig {
     /**
      * This bean returns a no-op shiro filter when authorization is disabled.
      *
+     * @param fedoraPropsConfig Fedora properties.
      * @return no-op shiro filter
      */
     @Bean
-    public Filter shiroFilter() {
+    public Filter shiroFilter(final FedoraPropsConfig fedoraPropsConfig) {
         LOGGER.info("Authorization is disabled");
-        return new OncePerRequestFilter() {
-            @Override
-            protected void doFilterInternal(final HttpServletRequest httpServletRequest,
-                                            final HttpServletResponse httpServletResponse,
-                                            final FilterChain filterChain) throws ServletException, IOException {
-                filterChain.doFilter(httpServletRequest, httpServletResponse);
-            }
-        };
+        if (fedoraPropsConfig.isCorsEnabled()) {
+            return new CorsResponseFilter();
+        } else {
+            return new OncePerRequestFilter() {
+                @Override
+                protected void doFilterInternal(final HttpServletRequest httpServletRequest,
+                                                final HttpServletResponse httpServletResponse,
+                                                final FilterChain filterChain) throws ServletException, IOException {
+                    filterChain.doFilter(httpServletRequest, httpServletResponse);
+                }
+            };
+        }
     }
 
 }

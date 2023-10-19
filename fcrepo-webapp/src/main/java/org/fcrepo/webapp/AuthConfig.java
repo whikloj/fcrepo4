@@ -8,6 +8,7 @@ package org.fcrepo.webapp;
 
 import javax.servlet.Filter;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
@@ -24,11 +25,12 @@ import org.fcrepo.auth.common.HttpHeaderPrincipalProvider;
 import org.fcrepo.auth.common.PrincipalProvider;
 import org.fcrepo.auth.common.ServletContainerAuthFilter;
 import org.fcrepo.auth.common.ServletContainerAuthenticatingRealm;
-import org.fcrepo.auth.webac.CorsResponseFilter;
+import org.fcrepo.http.api.responses.CorsResponseFilter;
 import org.fcrepo.auth.webac.WebACAuthorizingRealm;
 import org.fcrepo.auth.webac.WebACFilter;
 import org.fcrepo.config.AuthPropsConfig;
 import org.fcrepo.config.ConditionOnPropertyTrue;
+import org.fcrepo.config.FedoraPropsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -65,6 +67,11 @@ public class AuthConfig {
     static class DelegatePrincipalEnabled extends ConditionOnPropertyTrue {
         DelegatePrincipalEnabled() {
             super(AuthPropsConfig.FCREPO_AUTH_PRINCIPAL_DELEGATE_ENABLED, true);
+        }
+    }
+    static class CorsEnabled extends ConditionOnPropertyTrue {
+        CorsEnabled() {
+            super(FedoraPropsConfig.FCREPO_CORS_ENABLE_HEADERS, false);
         }
     }
 
@@ -162,6 +169,7 @@ public class AuthConfig {
      */
     @Bean
     @Order(1)
+    @Conditional(AuthConfig.CorsEnabled.class)
     public Filter corsFilter() {
         return new CorsResponseFilter();
     }
@@ -204,32 +212,42 @@ public class AuthConfig {
      * principal provider filters, and finally the webACFilter
      *
      * @param propsConfig config properties
+     * @param fedoraPropsConfig fedora config properties
      * @return shiro filter
      */
     @Bean
     @Order(100)
-    public ShiroFilterFactoryBean shiroFilter(final AuthPropsConfig propsConfig) {
+    public ShiroFilterFactoryBean shiroFilter(
+            final AuthPropsConfig propsConfig,
+            final FedoraPropsConfig fedoraPropsConfig
+    ) {
         final var filter = new ShiroFilterFactoryBean();
         filter.setSecurityManager(securityManager());
-        filter.setFilterChainDefinitions("/** = corsFilter, servletContainerAuthFilter,"
-                + principalProviderChain(propsConfig) + "webACFilter");
+        final List<String> filterDefinitionsList = new ArrayList<>();
+        if (fedoraPropsConfig.isCorsEnabled()) {
+            filterDefinitionsList.add("corsFilter");
+        }
+        filterDefinitionsList.add("servletContainerAuthFilter");
+        filterDefinitionsList.addAll(principalProviderChain(propsConfig));
+        filterDefinitionsList.add("webACFilter");
+        filter.setFilterChainDefinitions("/** = " + String.join(", ", filterDefinitionsList));
         return filter;
     }
 
-    private String principalProviderChain(final AuthPropsConfig propsConfig) {
-        final var builder = new StringBuilder();
+    private List<String> principalProviderChain(final AuthPropsConfig propsConfig) {
+        final List<String> builder = new ArrayList<>();
 
         if (propsConfig.isAuthPrincipalHeaderEnabled()) {
-            builder.append("headerProvider,");
+            builder.add("headerProvider");
         }
         if (propsConfig.isAuthPrincipalRolesEnabled()) {
-            builder.append("containerRolesProvider,");
+            builder.add("containerRolesProvider");
         }
         if (propsConfig.isAuthPrincipalDelegateEnabled()) {
-            builder.append("delegatedPrincipalProvider,");
+            builder.add("delegatedPrincipalProvider");
         }
 
-        return builder.toString();
+        return builder;
     }
 
 }
