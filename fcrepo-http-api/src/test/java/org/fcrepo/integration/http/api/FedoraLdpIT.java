@@ -5,6 +5,35 @@
  */
 package org.fcrepo.integration.http.api;
 
+import static java.lang.Thread.sleep;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.time.ZoneId.of;
+import static java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME;
+import static java.util.Arrays.asList;
+import static java.util.regex.Pattern.compile;
+import static jakarta.ws.rs.core.HttpHeaders.ACCEPT;
+import static jakarta.ws.rs.core.HttpHeaders.CONTENT_DISPOSITION;
+import static jakarta.ws.rs.core.HttpHeaders.CONTENT_LENGTH;
+import static jakarta.ws.rs.core.HttpHeaders.CONTENT_TYPE;
+import static jakarta.ws.rs.core.HttpHeaders.LINK;
+import static jakarta.ws.rs.core.HttpHeaders.LOCATION;
+import static jakarta.ws.rs.core.Link.fromUri;
+import static jakarta.ws.rs.core.MediaType.TEXT_PLAIN;
+import static jakarta.ws.rs.core.Response.Status.BAD_REQUEST;
+import static jakarta.ws.rs.core.Response.Status.CONFLICT;
+import static jakarta.ws.rs.core.Response.Status.CREATED;
+import static jakarta.ws.rs.core.Response.Status.GONE;
+import static jakarta.ws.rs.core.Response.Status.METHOD_NOT_ALLOWED;
+import static jakarta.ws.rs.core.Response.Status.NOT_ACCEPTABLE;
+import static jakarta.ws.rs.core.Response.Status.NOT_FOUND;
+import static jakarta.ws.rs.core.Response.Status.NOT_MODIFIED;
+import static jakarta.ws.rs.core.Response.Status.NO_CONTENT;
+import static jakarta.ws.rs.core.Response.Status.OK;
+import static jakarta.ws.rs.core.Response.Status.PARTIAL_CONTENT;
+import static jakarta.ws.rs.core.Response.Status.PRECONDITION_FAILED;
+import static jakarta.ws.rs.core.Response.Status.REQUESTED_RANGE_NOT_SATISFIABLE;
+import static jakarta.ws.rs.core.Response.Status.UNSUPPORTED_MEDIA_TYPE;
+import static nu.validator.htmlparser.common.XmlViolationPolicy.ALLOW;
 import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.http.HttpStatus.SC_CREATED;
 import static org.apache.http.HttpStatus.SC_NO_CONTENT;
@@ -32,14 +61,6 @@ import static org.apache.jena.riot.WebContent.contentTypeSPARQLUpdate;
 import static org.apache.jena.riot.WebContent.contentTypeTurtle;
 import static org.apache.jena.vocabulary.DC_11.title;
 import static org.apache.jena.vocabulary.RDF.type;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.slf4j.LoggerFactory.getLogger;
 import static org.fcrepo.http.commons.domain.RDFMediaType.POSSIBLE_RDF_RESPONSE_VARIANTS_STRING;
 import static org.fcrepo.http.commons.domain.RDFMediaType.POSSIBLE_RDF_VARIANTS;
 import static org.fcrepo.http.commons.domain.RDFMediaType.TURTLE;
@@ -85,93 +106,15 @@ import static org.fcrepo.kernel.api.RdfLexicon.VERSIONING_TIMEGATE_TYPE;
 import static org.fcrepo.kernel.api.models.ExternalContent.COPY;
 import static org.fcrepo.kernel.api.models.ExternalContent.PROXY;
 import static org.fcrepo.kernel.api.models.ExternalContent.REDIRECT;
-import static java.lang.Thread.sleep;
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.time.ZoneId.of;
-import static java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME;
-import static java.util.Arrays.asList;
-import static java.util.regex.Pattern.compile;
-import static jakarta.ws.rs.core.HttpHeaders.ACCEPT;
-import static jakarta.ws.rs.core.HttpHeaders.CONTENT_DISPOSITION;
-import static jakarta.ws.rs.core.HttpHeaders.CONTENT_LENGTH;
-import static jakarta.ws.rs.core.HttpHeaders.CONTENT_TYPE;
-import static jakarta.ws.rs.core.HttpHeaders.LINK;
-import static jakarta.ws.rs.core.HttpHeaders.LOCATION;
-import static jakarta.ws.rs.core.Link.fromUri;
-import static jakarta.ws.rs.core.MediaType.TEXT_PLAIN;
-import static jakarta.ws.rs.core.Response.Status.BAD_REQUEST;
-import static jakarta.ws.rs.core.Response.Status.CONFLICT;
-import static jakarta.ws.rs.core.Response.Status.CREATED;
-import static jakarta.ws.rs.core.Response.Status.GONE;
-import static jakarta.ws.rs.core.Response.Status.METHOD_NOT_ALLOWED;
-import static jakarta.ws.rs.core.Response.Status.NOT_ACCEPTABLE;
-import static jakarta.ws.rs.core.Response.Status.NOT_FOUND;
-import static jakarta.ws.rs.core.Response.Status.NOT_MODIFIED;
-import static jakarta.ws.rs.core.Response.Status.NO_CONTENT;
-import static jakarta.ws.rs.core.Response.Status.OK;
-import static jakarta.ws.rs.core.Response.Status.PARTIAL_CONTENT;
-import static jakarta.ws.rs.core.Response.Status.PRECONDITION_FAILED;
-import static jakarta.ws.rs.core.Response.Status.REQUESTED_RANGE_NOT_SATISFIABLE;
-import static jakarta.ws.rs.core.Response.Status.UNSUPPORTED_MEDIA_TYPE;
-import static nu.validator.htmlparser.common.XmlViolationPolicy.ALLOW;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.slf4j.LoggerFactory.getLogger;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Iterators;
-import org.apache.commons.io.IOUtils;
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpDelete;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpHead;
-import org.apache.http.client.methods.HttpOptions;
-import org.apache.http.client.methods.HttpPatch;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.client.methods.HttpRequestBase;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.entity.BasicHttpEntity;
-import org.apache.http.entity.ByteArrayEntity;
-import org.apache.http.entity.FileEntity;
-import org.apache.http.entity.InputStreamEntity;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.cache.CachingHttpClientBuilder;
-import org.apache.http.util.EntityUtils;
-import org.apache.jena.atlas.lib.Sink;
-import org.apache.jena.atlas.lib.SinkToCollection;
-import org.apache.jena.graph.Node;
-import org.apache.jena.graph.NodeFactory;
-import org.apache.jena.graph.Triple;
-import org.apache.jena.query.Dataset;
-import org.apache.jena.rdf.model.Model;
-import org.apache.jena.rdf.model.Property;
-import org.apache.jena.rdf.model.Resource;
-import org.apache.jena.rdf.model.ResourceFactory;
-import org.apache.jena.rdf.model.Statement;
-import org.apache.jena.rdf.model.StmtIterator;
-import org.apache.jena.riot.Lang;
-import org.apache.jena.riot.RDFFormat;
-import org.apache.jena.riot.RDFParser;
-import org.apache.jena.riot.system.StreamRDFLib;
-import org.apache.jena.sparql.core.DatasetGraph;
-import org.apache.jena.sparql.core.Quad;
-import org.apache.jena.vocabulary.DC_11;
-import org.apache.jena.vocabulary.RDF;
-import org.glassfish.jersey.media.multipart.ContentDisposition;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.springframework.test.context.TestExecutionListeners;
-import org.xml.sax.ErrorHandler;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
-import org.xml.sax.SAXParseException;
-import org.fcrepo.http.commons.domain.RDFMediaType;
-import org.fcrepo.http.commons.test.util.CloseableDataset;
-import org.fcrepo.kernel.api.RdfLexicon;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -200,11 +143,71 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
+
 import jakarta.ws.rs.core.Link;
 import jakarta.ws.rs.core.Response.Status;
 import jakarta.ws.rs.core.Variant;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Iterators;
 import nu.validator.htmlparser.sax.HtmlParser;
 import nu.validator.saxtree.TreeBuilder;
+import org.apache.commons.io.IOUtils;
+import org.apache.http.Header;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpDelete;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpHead;
+import org.apache.http.client.methods.HttpOptions;
+import org.apache.http.client.methods.HttpPatch;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
+import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.entity.BasicHttpEntity;
+import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.entity.FileEntity;
+import org.apache.http.entity.InputStreamEntity;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.cache.CachingHttpClientBuilder;
+import org.apache.http.util.EntityUtils;
+import org.apache.jena.atlas.lib.Sink;
+import org.apache.jena.atlas.lib.SinkToCollection;
+import org.apache.jena.datatypes.xsd.XSDDatatype;
+import org.apache.jena.graph.Node;
+import org.apache.jena.graph.NodeFactory;
+import org.apache.jena.graph.Triple;
+import org.apache.jena.query.Dataset;
+import org.apache.jena.rdf.model.Model;
+import org.apache.jena.rdf.model.Property;
+import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.rdf.model.ResourceFactory;
+import org.apache.jena.rdf.model.Statement;
+import org.apache.jena.rdf.model.StmtIterator;
+import org.apache.jena.riot.Lang;
+import org.apache.jena.riot.RDFFormat;
+import org.apache.jena.riot.RDFParser;
+import org.apache.jena.riot.system.StreamRDFLib;
+import org.apache.jena.sparql.core.DatasetGraph;
+import org.apache.jena.sparql.core.Quad;
+import org.apache.jena.vocabulary.DC_11;
+import org.apache.jena.vocabulary.RDF;
+import org.fcrepo.http.commons.domain.RDFMediaType;
+import org.fcrepo.http.commons.test.util.CloseableDataset;
+import org.fcrepo.kernel.api.RdfLexicon;
+import org.glassfish.jersey.media.multipart.ContentDisposition;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.springframework.test.context.TestExecutionListeners;
+import org.xml.sax.ErrorHandler;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
 
 /**
  * @author cabeer
@@ -5555,11 +5558,12 @@ public class FedoraLdpIT extends AbstractResourceIT {
 
     @Test
     public void testPutOnBinaryHasSize() throws IOException {
+        final String xsdLong = "http://www.w3.org/2001/XMLSchema#long";
         final String putBodyTemplate = "PREFIX premis: <http://www.loc.gov/premis/rdf/v1#>\n" +
                 "PREFIX ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#>\n" +
                 "\n" +
                 "<%s>\n" +
-                "        premis:hasSize           \"%s\"^^<http://www.w3.org/2001/XMLSchema#long>;\n" +
+                "        premis:hasSize           \"%s\"^^<%s>;\n" +
                 "        ebucore:filename         \"empty-test-file.txt\";\n" +
                 "        ebucore:hasMimeType      \"application/x-www-form-urlencoded\".";
         final String location;
@@ -5581,7 +5585,7 @@ public class FedoraLdpIT extends AbstractResourceIT {
         final Triple actualSizeTriple = Triple.create(createURI(location), HAS_SIZE.asNode(),
                 createLiteralByValue(hasSizeValue));
         // Add a different value for premis:hasSize
-        final String body = String.format(putBodyTemplate, location, "12345");
+        final String body = String.format(putBodyTemplate, location, "12345", xsdLong);
         // Triple with fake size (12345L) as object
         final Triple fakeSize_12345_triple = Triple.create(createURI(location), HAS_SIZE.asNode(),
                 createLiteralByValue(12345L));
@@ -5597,7 +5601,7 @@ public class FedoraLdpIT extends AbstractResourceIT {
             assertTrue(hasSizeTriples.contains(fakeSize_12345_triple));
         }
         // Try to add the same value as originally calculated (i.e. 25L)
-        final String body2 = String.format(putBodyTemplate, location, hasSizeValue);
+        final String body2 = String.format(putBodyTemplate, location, hasSizeValue, xsdLong);
         final var putBinary2 = new HttpPut(location + "/" + FCR_METADATA);
         putBinary2.setEntity(new StringEntity(body2, UTF_8));
         putBinary2.addHeader(CONTENT_TYPE, TURTLE);
@@ -5607,13 +5611,39 @@ public class FedoraLdpIT extends AbstractResourceIT {
             final List<Triple> hasSizeTriples = parseResponseToHasSizeTriples(response);
             assertEquals(1, hasSizeTriples.size());
             assertTrue(hasSizeTriples.contains(actualSizeTriple));
+            // Just to make sure it was changed.
             assertFalse(hasSizeTriples.contains(fakeSize_12345_triple));
         }
-        // Try to add the same value as first added (i.e. 12345L)
+        // Now try excluding SMTs and still see the user's value which is the same.
+        final var get4 = new HttpGet(location + "/" + FCR_METADATA);
+        get4.addHeader("Prefer", "return=representation; omit=\"http://fedora.info/definitions/fcrepo#ServerManaged\"");
+        try (final var response = execute(get4)) {
+            assertEquals(SC_OK, getStatus(response));
+            final List<Triple> hasSizeTriples = parseResponseToHasSizeTriples(response);
+            assertEquals(1, hasSizeTriples.size());
+            assertTrue(hasSizeTriples.contains(actualSizeTriple));
+        }
+        // Try to put the same value with a different datatype (int instead of long)
+        // Triple with changed datatype as object
+        final Triple wrong_datatype_triple = Triple.create(createURI(location), HAS_SIZE.asNode(),
+                createLiteralByValue(String.valueOf(hasSizeValue), XSDDatatype.XSDint));
+        final String body3 = String.format(putBodyTemplate, location, hasSizeValue, "http://www.w3.org/2001/XMLSchema#int");
         final var putBinary3 = new HttpPut(location + "/" + FCR_METADATA);
-        putBinary3.setEntity(new StringEntity(body, UTF_8)); // Reuse the body
+        putBinary3.setEntity(new StringEntity(body3, UTF_8));
         putBinary3.addHeader(CONTENT_TYPE, TURTLE);
         assertEquals(SC_NO_CONTENT, getStatus(putBinary3));
+        try (final var response = execute(new HttpGet(location + "/" + FCR_METADATA))) {
+            assertEquals(SC_OK, getStatus(response));
+            final List<Triple> hasSizeTriples = parseResponseToHasSizeTriples(response);
+            assertEquals(2, hasSizeTriples.size());
+            assertTrue(hasSizeTriples.contains(actualSizeTriple));
+            assertTrue(hasSizeTriples.contains(wrong_datatype_triple));
+        }
+        // Try to add the same value as first added (i.e. 12345L)
+        final var putBinary4 = new HttpPut(location + "/" + FCR_METADATA);
+        putBinary4.setEntity(new StringEntity(body, UTF_8)); // Reuse the body
+        putBinary4.addHeader(CONTENT_TYPE, TURTLE);
+        assertEquals(SC_NO_CONTENT, getStatus(putBinary4));
         try (final var response = execute(new HttpGet(location + "/" + FCR_METADATA))) {
             assertEquals(SC_OK, getStatus(response));
             final List<Triple> hasSizeTriples = parseResponseToHasSizeTriples(response);
@@ -5622,16 +5652,27 @@ public class FedoraLdpIT extends AbstractResourceIT {
             assertTrue(hasSizeTriples.contains(fakeSize_12345_triple));
         }
         // Now add a whole new value
-        final var putBinary4 = new HttpPut(location + "/" + FCR_METADATA);
-        final var body4 = String.format(putBodyTemplate, location, "9999");
-        putBinary4.setEntity(new StringEntity(body4, UTF_8)); // Reuse the body
-        putBinary4.addHeader(CONTENT_TYPE, TURTLE);
-        assertEquals(SC_NO_CONTENT, getStatus(putBinary4));
+        final var putBinary5 = new HttpPut(location + "/" + FCR_METADATA);
+        final var body4 = String.format(putBodyTemplate, location, "9999", xsdLong);
+        putBinary5.setEntity(new StringEntity(body4, UTF_8)); // Reuse the body
+        putBinary5.addHeader(CONTENT_TYPE, TURTLE);
+        assertEquals(SC_NO_CONTENT, getStatus(putBinary5));
         try (final var response = execute(new HttpGet(location + "/" + FCR_METADATA))) {
             assertEquals(SC_OK, getStatus(response));
             final List<Triple> hasSizeTriples = parseResponseToHasSizeTriples(response);
             assertEquals(2, hasSizeTriples.size());
             assertTrue(hasSizeTriples.contains(actualSizeTriple));
+            assertTrue(hasSizeTriples.contains(Triple.create(createURI(location), HAS_SIZE.asNode(),
+                    createLiteralByValue(9999L))));
+        }
+        // Now try excluding SMTs and still see the user's value.
+        final var get5 = new HttpGet(location + "/" + FCR_METADATA);
+        get5.addHeader("Prefer", "return=representation; omit=\"http://fedora.info/definitions/fcrepo#ServerManaged\"");
+        try (final var response = execute(get5)) {
+            assertEquals(SC_OK, getStatus(response));
+            final List<Triple> hasSizeTriples = parseResponseToHasSizeTriples(response);
+            assertEquals(1, hasSizeTriples.size());
+            assertFalse(hasSizeTriples.contains(actualSizeTriple));
             assertTrue(hasSizeTriples.contains(Triple.create(createURI(location), HAS_SIZE.asNode(),
                     createLiteralByValue(9999L))));
         }
@@ -5665,6 +5706,11 @@ public class FedoraLdpIT extends AbstractResourceIT {
         }
     }
 
+    /**
+     * Generate a random alphanumeric string
+     * @param length the length of the string
+     * @return the string
+     */
     private String generateRandomString(final int length) {
         final String characters = "0123456abcdefghijklmnopqrstuvwxyz";
         final var rng = new Random();
