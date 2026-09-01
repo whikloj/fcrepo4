@@ -8,6 +8,7 @@ package org.fcrepo.kernel.impl.services;
 import static org.apache.jena.graph.NodeFactory.createLiteralByValue;
 import static org.apache.jena.graph.NodeFactory.createURI;
 import static org.fcrepo.kernel.api.RdfLexicon.HAS_SIZE;
+import static org.fcrepo.kernel.api.RdfLexicon.SIZE;
 import static java.util.stream.Stream.empty;
 
 import java.util.ArrayList;
@@ -102,20 +103,26 @@ public class ResourceTripleServiceImpl implements ResourceTripleService {
     }
 
     /**
-     * Filter out premis:hasSize triples from the user if it's identical to the server manage instance.
+     * Filter out premis:hasSize and premis3:size triples from the user if it's identical to the server manage instance.
      * @param resource The resource
      * @param userTriples The user provided triples
      * @return The new stream of triples
      */
     private RdfStream deduplicateHasSize(final FedoraResource resource, final RdfStream userTriples) {
         final Node subject = createURI(resource.getDescribedResource().getId());
+        final Long contentSize = ((Binary)resource.getDescribedResource()).getContentSize();
         final Triple hasSizeSMT = Triple.create(
                 subject,
                 HAS_SIZE.asNode(),
-                createLiteralByValue(String.valueOf(((Binary)resource.getDescribedResource()).getContentSize()),
-                        XSDDatatype.XSDlong)
+                createLiteralByValue(String.valueOf(contentSize), XSDDatatype.XSDlong)
         );
-        return new DefaultRdfStream(subject, userTriples.filter(t -> !t.equals(hasSizeSMT)));
+        final Triple hasSize3SMT = Triple.create(
+                subject,
+                SIZE.asNode(),
+                createLiteralByValue(String.valueOf(contentSize), XSDDatatype.XSDnonNegativeInteger)
+        );
+        return new DefaultRdfStream(subject, userTriples
+                .filter(t -> !(t.equals(hasSizeSMT) || t.equals(hasSize3SMT))));
     }
 
 }
